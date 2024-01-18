@@ -1,11 +1,11 @@
 "use client"
 import React from "react";
-import CodeEditorWindow from './components/codeEditorWindow.tsx/page';
+import Landing from "@/app/components/landing/page";
 
 const Page = () => {
   return (
     <div className="h-screen">
-     <CodeEditorWindow/>
+     <Landing />
     </div>
   );
 };

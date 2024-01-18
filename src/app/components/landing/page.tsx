@@ -1,20 +1,20 @@
 import React, { useEffect, useState } from "react";
 import CodeEditorWindow from "@/app/components/codeEditorWindow.tsx/page";
 import axios from "axios";
-import { classnames } from "../utils/general";
+import { classnames } from "@/app/utils/gendral";
 import { languageOptions } from "@/app/components/languageOptions/page";
 
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
-import { defineTheme } from "../lib/defineTheme";
-import useKeyPress from "../hooks/useKeyPress";
-import Footer from "./Footer";
-import OutputWindow from "./OutputWindow";
-import CustomInput from "./CustomInput";
-import OutputDetails from "./OutputDetails";
-import ThemeDropdown from "./ThemeDropdown";
-import LanguagesDropdown from "./LanguagesDropdown";
+import { defineTheme } from "@/app/lib/defineTheme/page";
+import useKeyPress from "@/app/hooks/keyboardEvent";
+import Footer from "@/app/components/footer/page";
+import OutputWindow from "@/app/components/outputWindow/page";
+import CustomInput from "@/app/components/customInputs";
+import OutputDetails from "@/app/components/outPutDetails/page";
+import ThemeDropdown from "@/app/components/themeDropdown/page";
+import LanguagesDropdown from "@/app/components/languageDropdown/page";
 
 const javascriptDefault = "// some comment";
 
@@ -22,14 +22,17 @@ const Landing = () => {
   const [code, setCode] = useState(javascriptDefault);
   const [customInput, setCustomInput] = useState("");
   const [outputDetails, setOutputDetails] = useState(null);
-  const [processing, setProcessing] = useState(null);
-  const [theme, setTheme] = useState("cobalt");
+  const [processing, setProcessing] = useState(false);
+  const [theme, setTheme] = useState<{ value: string; label: string }>({
+    value: "default",
+    label: "Default",
+  });
   const [language, setLanguage] = useState(languageOptions[0]);
 
   const enterPress = useKeyPress("Enter");
   const ctrlPress = useKeyPress("Control");
 
-  const onSelectChange = (sl) => {
+  const onSelectChange = (sl: any) => {
     console.log(sl);
     setLanguage(sl);
   };
@@ -38,11 +41,11 @@ const Landing = () => {
     if (enterPress && ctrlPress) {
       console.log("enterPress", enterPress);
       console.log("ctrlPress", ctrlPress);
-      handelCompile();
+      handleCompile();
     }
   }, [ctrlPress, enterPress]);
 
-  const onChange = (action, data) => {
+  const onChange = (action: string, data: any) => {
     switch (action) {
       case "code": {
         setCode(data);
@@ -54,11 +57,86 @@ const Landing = () => {
     }
   };
 
-  const handleCompile = () => {};
+  const handleCompile = () => {
+    setProcessing(true);
+    const formData = {
+      language_id: language.id,
+      // encode source code in base64
+      source_code: btoa(code),
+      stdin: btoa(customInput),
+    };
+    const options = {
+      method: "POST",
+      url: process.env.REACT_APP_RAPID_API_URL,
+      params: { base64_encoded: "true", fields: "*" },
+      headers: {
+        "content-type": "application/json",
+        "Content-Type": "application/json",
+        "X-RapidAPI-Host": process.env.REACT_APP_RAPID_API_HOST,
+        "X-RapidAPI-Key": process.env.REACT_APP_RAPID_API_KEY,
+      },
+      data: formData,
+    };
 
-  const checkStatus = async (token) => {};
+    axios
+      .request(options)
+      .then(function (response) {
+        console.log("res.data", response.data);
+        const token = response.data.token;
+        checkStatus(token);
+      })
+      .catch((err) => {
+        let error = err.response ? err.response.data : err;
+        setProcessing(false);
+        console.log(error);
+      });
+  };
 
-  const handleThemeChange = (th) => {};
+  const checkStatus = async (token: string) => {
+    const options = {
+      method: "GET",
+      url: process.env.REACT_APP_RAPID_API_URL + "/" + token,
+      params: { base64_encoded: "true", fields: "*" },
+      headers: {
+        "X-RapidAPI-Host": process.env.REACT_APP_RAPID_API_HOST,
+        "X-RapidAPI-Key": process.env.REACT_APP_RAPID_API_KEY,
+      },
+    };
+    try {
+      let response = await axios.request(options);
+      let statusId = response.data.status?.id;
+
+      // Processed - we have a result
+      if (statusId === 1 || statusId === 2) {
+        // still processing
+        setTimeout(() => {
+          checkStatus(token);
+        }, 2000);
+        return;
+      } else {
+        setProcessing(false);
+        setOutputDetails(response.data);
+        showSuccessToast(`Compiled Successfully!`);
+        console.log("response.data", response.data);
+        return;
+      }
+    } catch (err) {
+      console.log("err", err);
+      setProcessing(false);
+      showErrorToast(err ? err : "Somthing went wrong! Please try again");
+    }
+  };
+
+  const handleThemeChange = (th: any) => {
+    const theme = th;
+    console.log("theme...", theme);
+
+    if (["light", "vs-dark"].includes(theme.value)) {
+      setTheme(theme);
+    } else {
+      defineTheme(theme.value).then((_) => setTheme(theme));
+    }
+  };
 
   useEffect(() => {
     defineTheme("oceanic-next").then((_) =>
@@ -66,7 +144,7 @@ const Landing = () => {
     );
   }, []);
 
-  const showSuccessToast = (msg) => {
+  const showSuccessToast = (msg: any) => {
     toast.success(msg || `Compiled Successfully!`, {
       position: "top-right",
       autoClose: 1000,
@@ -78,7 +156,7 @@ const Landing = () => {
     });
   };
 
-  const showErrorToast = (msg) => {
+  const showErrorToast = (msg: any) => {
     toast.error(msg || `Somthing went wrong! Please try again`, {
       position: "top-right",
       autoClose: 1000,
